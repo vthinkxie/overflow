@@ -1,0 +1,18 @@
+app-overflow-container {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  position: relative;
+}
+.container {
+  border: 5px solid green;
+  padding: 8px;
+  max-width: 300px;
+  margin-top: 32px;
+}
+
+app-overflow-container div {
+  margin: 0 16px 0 8px;
+  padding: 4px 8px;
+  background: rgba(255, 0, 0, 0.2);
+}
