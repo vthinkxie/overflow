@@ -111,6 +111,7 @@ export class OverflowContainerComponent
       )
     );
     this.overflowItems$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      // TODO: reorg
       this.displayCount$.next(Number.MAX_SAFE_INTEGER);
       this.suffixFixedStart$.next(null);
       this.restWidth$.next(0);
@@ -164,6 +165,7 @@ export class OverflowContainerComponent
                 (lastIndex === 0 && totalWidth <= containerWidth) ||
                 // Last two width will be the final width
                 (i === lastIndex - 1 &&
+                  overflowItems.get(lastIndex)?.itemWidth !== undefined &&
                   totalWidth + overflowItems.get(lastIndex)!.itemWidth! <=
                     containerWidth)
               ) {
@@ -184,6 +186,7 @@ export class OverflowContainerComponent
 
             if (
               this.overflowSuffix &&
+              overflowItems.get(0)?.itemWidth !== undefined &&
               overflowItems.get(0)!.itemWidth! + suffixWidth > containerWidth
             ) {
               this.suffixFixedStart$.next(null);
@@ -192,24 +195,18 @@ export class OverflowContainerComponent
           }
         }
       );
-    this.suffixFixedStart$
+    combineLatest([this.suffixFixedStart$, this.displayCount$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe((suffixFixedStart) => {
-        if (suffixFixedStart !== null) {
-          this.overflowSuffix?.setSuffixStyle({
-            position: 'absolute',
-            left: suffixFixedStart,
-            top: 0,
-          });
-        }
+      .subscribe(([suffixFixedStart, displayCount]) => {
+        this.overflowSuffix?.setSuffixStyle(suffixFixedStart, displayCount);
       });
     combineLatest([this.displayCount$, this.overflowItems$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([displayCount, overflowItems]) => {
-        overflowItems.forEach((item, index) => {
-          item.setItemStyle(index <= displayCount, index);
-        });
-      });
+      .subscribe(([displayCount, overflowItems]) =>
+        overflowItems.forEach((item, index) =>
+          item.setItemStyle(index <= displayCount, index)
+        )
+      );
     combineLatest([this.displayRest$, this.displayCount$])
       .pipe(takeUntil(this.destroy$))
       .subscribe(([displayRest, displayCount]) => {

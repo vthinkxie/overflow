@@ -23,8 +23,21 @@ export class OverflowSuffixDirective {
     private cdr: ChangeDetectorRef
   ) {}
 
-  setSuffixStyle(style: { [key: string]: string | number | undefined }) {
-    this.suffixStyle = style;
-    this.cdr.markForCheck();
+  setSuffixStyle(start: number | null, order: number): void {
+    if (start !== null) {
+      this.suffixStyle = {
+        position: 'absolute',
+        left: `${start}px`,
+        top: 0,
+        opacity: 1,
+        order: order,
+      };
+    } else {
+      this.suffixStyle = {
+        opacity: 1,
+        order: order,
+      };
+    }
+    this.cdr.detectChanges();
   }
 }

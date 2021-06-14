@@ -23,3 +23,35 @@ app-overflow-container {
   padding: 4px 8px;
   background: rgba(255, 0, 0, 0.2);
 }
+
+.suffix {
+  position: relative;
+  max-width: 100%;
+}
+
+.input {
+  border: none;
+  font-size: 12px;
+  margin: 0;
+  outline: none;
+  line-height: 20px;
+  padding: 0 4px;
+  background: rgba(0, 0, 0, 0.1);
+  min-width: 10px;
+  max-width: 100%;
+  font-family: -apple-system;
+}
+
+.measure {
+  border: none;
+  font-size: 12px;
+  margin: 0;
+  outline: none;
+  line-height: 20px;
+  padding: 0 4px;
+  pointer-events: none;
+  position: absolute;
+  font-family: -apple-system;
+  left: 0;
+  top: 200%;
+}

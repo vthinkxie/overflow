@@ -11,10 +11,33 @@
 <div class="container">
   <app-overflow-container #overflowContainerComponent>
     <div class="label" appOverflowItem *ngFor="let item of list; let i = index">
-      <div class="inner">Label {{i+1}}</div>
+      <div class="inner">Label {{ i + 1 }}</div>
     </div>
     <div appOverflowRest class="label">
-      <div class="inner">+{{(overflowContainerComponent.omittedItems$|async)?.length}}...</div>
+      <div class="inner">
+        +{{ (overflowContainerComponent.omittedItems$ | async)?.length }}...
+      </div>
+    </div>
+  </app-overflow-container>
+</div>
+
+<div class="container">
+  <app-overflow-container #overflowContainerComponentSuffix>
+    <div class="label" appOverflowItem *ngFor="let item of list; let i = index">
+      <div class="inner">Label {{ i + 1 }}</div>
+    </div>
+    <div appOverflowRest class="label">
+      <div class="inner">
+        +{{
+          (overflowContainerComponentSuffix.omittedItems$ | async)?.length
+        }}...
+      </div>
+    </div>
+    <div class="label" appOverflowSuffix>
+      <div class="suffix">
+        <input class="input" [style.width.px]="width" #inputElement (input)="updateInputWidth(measureElement,inputElement)" />
+        <div class="measure" #measureElement>{{text}}</div>
+      </div>
     </div>
   </app-overflow-container>
 </div>

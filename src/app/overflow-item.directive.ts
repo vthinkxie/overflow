@@ -37,6 +37,5 @@ export class OverflowItemDirective {
       position: mergedHidden ? 'absolute' : undefined,
     };
     this.cdr.detectChanges();
-    // ɵmarkDirty(this);
   }
 }
