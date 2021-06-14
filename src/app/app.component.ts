@@ -6,5 +6,10 @@ import { Component } from '@angular/core';
   styleUrls: ['./app.component.css'],
 })
 export class AppComponent {
-  resizeHandler = (v: any) => console.log(v);
+  count = 10;
+  list = new Array(this.count).fill(0);
+  generateList(e: Event): void {
+    const count = (e.target as HTMLSelectElement).value;
+    this.list = new Array(+count).fill(0);
+  }
 }

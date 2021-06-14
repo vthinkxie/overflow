@@ -1,17 +1,20 @@
+<select [value]="count" (change)="generateList($event)">
+  <option value="0">0</option>
+  <option value="1">1</option>
+  <option value="2">2</option>
+  <option value="3">3</option>
+  <option value="5">5</option>
+  <option value="10">10</option>
+  <option value="20">20</option>
+  <option value="200">200</option>
+</select>
 <div class="container">
-  <app-overflow-container #overflowContainerComponent [maxCount]="'responsive'">
-    <div appOverflowItem>1</div>
-    <div appOverflowItem>2</div>
-    <div appOverflowItem>3</div>
-    <div appOverflowItem>4</div>
-    <div appOverflowItem>5</div>
-    <div appOverflowItem>6</div>
-    <div appOverflowItem>7</div>
-    <div appOverflowItem>8</div>
-    <div appOverflowItem>9</div>
-    <div appOverflowItem>10</div>
-    <div appOverflowItem>11</div>
-    <div appOverflowItem>12</div>
-    <div appOverflowRest>{{(overflowContainerComponent.omittedItems$|async)?.length}}++</div>
+  <app-overflow-container #overflowContainerComponent>
+    <div class="label" appOverflowItem *ngFor="let item of list; let i = index">
+      <div class="inner">Label {{i+1}}</div>
+    </div>
+    <div appOverflowRest class="label">
+      <div class="inner">+{{(overflowContainerComponent.omittedItems$|async)?.length}}...</div>
+    </div>
   </app-overflow-container>
 </div>

@@ -19,7 +19,7 @@ export class OverflowRestDirective {
   restWidth$ = this.nzResizeObserver
     .observe(this.elementRef.nativeElement)
     .pipe(
-      map(([item]) => item.target.clientWidth),
+      map(([item]) => (item.target as HTMLElement).offsetWidth),
       tap((width) => (this.restWidth = width))
     );
   restWidth = 0;
@@ -29,26 +29,16 @@ export class OverflowRestDirective {
     private cdr: ChangeDetectorRef
   ) {}
 
-  setRestStyle(
-    responsive: boolean,
-    display: boolean,
-    invalidate: boolean,
-    order: number
-  ): void {
-    const mergedHidden = responsive && !display;
-    if (!invalidate) {
-      this.restStyle = {
-        opacity: mergedHidden ? 0 : 1,
-        height: mergedHidden ? 0 : undefined,
-        overflowY: mergedHidden ? 'hidden' : undefined,
-        order: responsive ? order : undefined,
-        pointerEvents: mergedHidden ? 'none' : undefined,
-        position: mergedHidden ? 'absolute' : undefined,
-      };
-    } else {
-      this.restStyle = undefined;
-    }
+  setRestStyle(display: boolean, order: number): void {
+    const mergedHidden = !display;
+    this.restStyle = {
+      opacity: mergedHidden ? 0 : 1,
+      height: mergedHidden ? 0 : undefined,
+      overflowY: mergedHidden ? 'hidden' : undefined,
+      order: order,
+      pointerEvents: mergedHidden ? 'none' : undefined,
+      position: mergedHidden ? 'absolute' : undefined,
+    };
     this.cdr.detectChanges();
-    // ɵmarkDirty(this);
   }
 }

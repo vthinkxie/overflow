@@ -13,7 +13,7 @@ export class OverflowSuffixDirective {
   suffixWidth$ = this.nzResizeObserver
     .observe(this.elementRef.nativeElement)
     .pipe(
-      map(([item]) => item.target.clientWidth),
+      map(([item]) => (item.target as HTMLElement).offsetWidth),
       tap((width) => (this.suffixWidth = width))
     );
   suffixWidth = 0;

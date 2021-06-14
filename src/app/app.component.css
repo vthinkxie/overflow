@@ -11,7 +11,14 @@ app-overflow-container {
   margin-top: 32px;
 }
 
-app-overflow-container div {
+.label {
+  background: rgba(0, 255, 0, 0.2);
+  box-shadow: 0 0 1px black;
+  flex: none;
+  max-width: 100%;
+}
+
+.inner {
   margin: 0 16px 0 8px;
   padding: 4px 8px;
   background: rgba(255, 0, 0, 0.2);

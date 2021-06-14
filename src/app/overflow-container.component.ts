@@ -10,20 +10,20 @@ import {
   SimpleChanges,
   AfterContentInit,
   OnDestroy,
-  ɵmarkDirty,
   ContentChild,
   ChangeDetectorRef,
 } from '@angular/core';
 import { OverflowItemDirective } from './overflow-item.directive';
 import { NzResizeObserver } from './resize-observer';
 import {
-  delay,
   map,
   mergeMap,
   pairwise,
   startWith,
   switchMap,
   takeUntil,
+  takeWhile,
+  withLatestFrom,
 } from 'rxjs/operators';
 import {
   BehaviorSubject,
@@ -38,18 +38,15 @@ import { OverflowRestDirective } from './overflow-rest.directive';
 @Component({
   selector: 'app-overflow-container',
   template: ` <ng-content></ng-content>
-    <ng-container *ngIf="showRest$ | async"
-      ><ng-content select="[appOverflowRest]"></ng-content
-    ></ng-container>
+    <ng-content select="[appOverflowRest]"></ng-content>
     <ng-content select="[appOverflowSuffix]"></ng-content>`,
   providers: [NzResizeObserver],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OverflowContainerComponent
-  implements OnChanges, OnInit, AfterContentInit, OnDestroy
+  implements OnInit, AfterContentInit, OnDestroy
 {
-  @Input() maxCount: number | 'responsive' = Infinity;
-  maxCount$ = new BehaviorSubject<number | 'responsive'>(this.maxCount);
+  contentInit$ = new Subject<void>();
   @ContentChildren(OverflowItemDirective)
   overflowItems: QueryList<OverflowItemDirective> | undefined = undefined;
   @ContentChild(OverflowSuffixDirective)
@@ -65,73 +62,27 @@ export class OverflowContainerComponent
   restWidth$ = new BehaviorSubject<number>(0);
   suffixWidth$ = new BehaviorSubject<number>(0);
   suffixFixedStart$ = new BehaviorSubject<number | null>(null);
-  displayCount$ = new BehaviorSubject<number | null>(null);
-  mergedDisplayCount$ = this.displayCount$.pipe(
-    map((count) => {
-      if (count === null) {
-        return Number.MAX_SAFE_INTEGER;
-      } else {
-        return count || 0;
-      }
-    })
-  );
+  displayCount$ = new BehaviorSubject<number>(Number.MAX_SAFE_INTEGER);
   restReady$ = new BehaviorSubject<boolean>(false);
   mergedRestWidth$ = this.restWidth$.pipe(
     pairwise(),
     map(([prevRestWidth, restWidth]) => Math.max(prevRestWidth, restWidth))
   );
-  isResponsive$ = combineLatest([this.overflowItems$, this.maxCount$]).pipe(
-    map(
-      ([overflowItems, maxCount]) =>
-        maxCount === 'responsive' && overflowItems.length > 0
-    )
-  );
-  invalidate$ = this.maxCount$.pipe(map((maxCount) => maxCount === Infinity));
-  showRest$ = combineLatest([
-    this.isResponsive$,
-    this.maxCount$,
-    this.overflowItems$,
-  ]).pipe(
-    map(
-      ([isResponsive, maxCount, overflowItem]) =>
-        isResponsive ||
-        (typeof maxCount === 'number' && overflowItem.length > maxCount)
-    )
-  );
-  mergedData$ = combineLatest([
-    this.overflowItems$,
-    this.containerWidth$,
-    this.maxCount$,
-    this.isResponsive$,
-  ]).pipe(
-    map(([overflowItems, containerWidth, maxCount, isResponsive]) => {
+  mergedData$ = combineLatest([this.overflowItems$, this.containerWidth$]).pipe(
+    map(([overflowItems, containerWidth]) => {
       let items = overflowItems.toArray();
-
-      if (isResponsive) {
-        if (containerWidth === null) {
-          items = overflowItems.toArray();
-        } else {
-          items = overflowItems
-            .toArray()
-            .slice(0, Math.min(overflowItems.length, containerWidth / 10));
-        }
-      } else if (typeof maxCount === 'number') {
-        items = overflowItems.toArray().slice(0, maxCount);
+      if (containerWidth !== null) {
+        items = overflowItems
+          .toArray()
+          .slice(0, Math.min(overflowItems.length, containerWidth / 10));
       }
       return items;
     })
   );
-  omittedItems$ = combineLatest([
-    this.overflowItems$,
-    this.mergedData$,
-    this.isResponsive$,
-    this.mergedDisplayCount$,
-  ]).pipe(
-    map(([overflowItems, mergedData, isResponsive, mergedDisplayCount]) => {
-      if (isResponsive) {
-        return overflowItems.toArray().slice(mergedDisplayCount + 1);
-      }
-      return overflowItems.toArray().slice(mergedData.length);
+  omittedItems$ = combineLatest([this.overflowItems$, this.displayCount$]).pipe(
+    withLatestFrom(this.contentInit$),
+    map(([[overflowItems, displayCount]]) => {
+      return overflowItems.toArray().slice(displayCount + 1);
     })
   );
   displayRest$ = combineLatest([this.restReady$, this.omittedItems$]).pipe(
@@ -159,6 +110,13 @@ export class OverflowContainerComponent
         ).pipe(mergeMap(() => this.overflowItems$))
       )
     );
+    this.overflowItems$.pipe(takeUntil(this.destroy$)).subscribe(() => {
+      this.displayCount$.next(Number.MAX_SAFE_INTEGER);
+      this.suffixFixedStart$.next(null);
+      this.restWidth$.next(0);
+      this.suffixWidth$.next(0);
+      this.restReady$.next(false);
+    });
     combineLatest([
       this.containerWidth$,
       overflowItems$,
@@ -191,7 +149,7 @@ export class OverflowContainerComponent
             }
 
             for (let i = 0; i < len; i += 1) {
-              const currentItemWidth = overflowItems.get(i)!.itemWidth;
+              const currentItemWidth = overflowItems.get(i)?.itemWidth;
               // Break since data not ready
               if (currentItemWidth === undefined) {
                 this.updateDisplayCount(i - 1, true);
@@ -215,12 +173,13 @@ export class OverflowContainerComponent
                 break;
               } else if (totalWidth + mergedRestWidth > containerWidth) {
                 // Can not hold all the content to show rest
-                this.displayCount$.next(i - 1);
+                this.updateDisplayCount(i - 1);
                 this.suffixFixedStart$.next(
                   totalWidth - currentItemWidth - suffixWidth + restWidth
                 );
                 break;
               }
+              this.cdr.detectChanges();
             }
 
             if (
@@ -229,15 +188,14 @@ export class OverflowContainerComponent
             ) {
               this.suffixFixedStart$.next(null);
             }
+            this.cdr.detectChanges();
           }
-          this.cdr.detectChanges();
-          // ɵmarkDirty(this);
         }
       );
-    combineLatest([this.suffixFixedStart$, this.isResponsive$])
+    this.suffixFixedStart$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(([suffixFixedStart, isResponsive]) => {
-        if (suffixFixedStart !== null && isResponsive) {
+      .subscribe((suffixFixedStart) => {
+        if (suffixFixedStart !== null) {
           this.overflowSuffix?.setSuffixStyle({
             position: 'absolute',
             left: suffixFixedStart,
@@ -245,42 +203,21 @@ export class OverflowContainerComponent
           });
         }
       });
-    combineLatest([
-      this.isResponsive$,
-      this.invalidate$,
-      this.mergedDisplayCount$,
-      this.overflowItems$,
-    ])
+    combineLatest([this.displayCount$, this.overflowItems$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(
-        ([isResponsive, invalidate, mergedDisplayCount, overflowItems]) => {
-          overflowItems.forEach((item, index) => {
-            item.setItemStyle(
-              isResponsive,
-              index < mergedDisplayCount,
-              invalidate,
-              index
-            );
-          });
-        }
-      );
-    combineLatest([
-      this.isResponsive$,
-      this.displayRest$,
-      this.invalidate$,
-      this.mergedDisplayCount$,
-    ])
+      .subscribe(([displayCount, overflowItems]) => {
+        overflowItems.forEach((item, index) => {
+          item.setItemStyle(index <= displayCount, index);
+        });
+      });
+    combineLatest([this.displayRest$, this.displayCount$])
       .pipe(takeUntil(this.destroy$))
-      .subscribe(
-        ([isResponsive, displayRest, invalidate, mergedDisplayCount]) => {
-          this.overflowRest?.setRestStyle(
-            isResponsive,
-            displayRest,
-            invalidate,
-            displayRest ? mergedDisplayCount : Number.MAX_SAFE_INTEGER
-          );
-        }
-      );
+      .subscribe(([displayRest, displayCount]) => {
+        this.overflowRest?.setRestStyle(
+          displayRest,
+          displayRest ? displayCount : Number.MAX_SAFE_INTEGER
+        );
+      });
   }
   ngAfterContentInit(): void {
     this.overflowItems?.changes
@@ -288,12 +225,7 @@ export class OverflowContainerComponent
       .subscribe(this.overflowItems$);
     this.overflowSuffix?.suffixWidth$.subscribe(this.suffixWidth$);
     this.overflowRest?.restWidth$.subscribe(this.restWidth$);
-  }
-
-  ngOnChanges({ maxCount }: SimpleChanges): void {
-    if (maxCount) {
-      this.maxCount$.next(this.maxCount);
-    }
+    this.contentInit$.next();
   }
   ngOnDestroy(): void {
     this.destroy$.next();
