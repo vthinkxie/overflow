@@ -1,13 +1,10 @@
 import {
   Component,
   ChangeDetectionStrategy,
-  Input,
-  OnChanges,
   ContentChildren,
   QueryList,
   ElementRef,
   OnInit,
-  SimpleChanges,
   AfterContentInit,
   OnDestroy,
   ContentChild,
@@ -16,22 +13,15 @@ import {
 import { OverflowItemDirective } from './overflow-item.directive';
 import { NzResizeObserver } from './resize-observer';
 import {
+  filter,
   map,
-  mergeMap,
   pairwise,
   startWith,
   switchMap,
   takeUntil,
-  takeWhile,
   withLatestFrom,
 } from 'rxjs/operators';
-import {
-  BehaviorSubject,
-  combineLatest,
-  merge,
-  ReplaySubject,
-  Subject,
-} from 'rxjs';
+import { BehaviorSubject, combineLatest, ReplaySubject, Subject } from 'rxjs';
 import { OverflowSuffixDirective } from './overflow-suffix.directive';
 import { OverflowRestDirective } from './overflow-rest.directive';
 
@@ -64,26 +54,15 @@ export class OverflowContainerComponent
   suffixFixedStart$ = new BehaviorSubject<number | null>(null);
   displayCount$ = new BehaviorSubject<number>(Number.MAX_SAFE_INTEGER);
   restReady$ = new BehaviorSubject<boolean>(false);
-  mergedRestWidth$ = this.restWidth$.pipe(
+  maxRestWith$ = this.restWidth$.pipe(
     pairwise(),
     map(([prevRestWidth, restWidth]) => Math.max(prevRestWidth, restWidth))
   );
-  mergedData$ = combineLatest([this.overflowItems$, this.containerWidth$]).pipe(
-    map(([overflowItems, containerWidth]) => {
-      let items = overflowItems.toArray();
-      if (containerWidth !== null) {
-        items = overflowItems
-          .toArray()
-          .slice(0, Math.min(overflowItems.length, containerWidth / 10));
-      }
-      return items;
-    })
-  );
   omittedItems$ = combineLatest([this.overflowItems$, this.displayCount$]).pipe(
     withLatestFrom(this.contentInit$),
-    map(([[overflowItems, displayCount]]) => {
-      return overflowItems.toArray().slice(displayCount + 1);
-    })
+    map(([[overflowItems, displayCount]]) =>
+      overflowItems.toArray().slice(displayCount + 1)
+    )
   );
   displayRest$ = combineLatest([this.restReady$, this.omittedItems$]).pipe(
     map(([restReady, omittedItems]) => restReady && !!omittedItems.length)
@@ -103,60 +82,48 @@ export class OverflowContainerComponent
   ) {}
 
   ngOnInit(): void {
-    const overflowItems$ = this.overflowItems$.pipe(
-      switchMap((items) =>
-        merge(
-          ...[this.overflowItems$, ...items.map((item) => item.itemWidth$)]
-        ).pipe(mergeMap(() => this.overflowItems$))
-      )
+    const overflowItemsWidth$ = this.overflowItems$.pipe(
+      switchMap((items) => combineLatest(items.map((item) => item.itemWidth$)))
     );
-    this.overflowItems$.pipe(takeUntil(this.destroy$)).subscribe(() => {
-      // TODO: reorg
-      this.displayCount$.next(Number.MAX_SAFE_INTEGER);
-      this.suffixFixedStart$.next(null);
-      this.restWidth$.next(0);
-      this.suffixWidth$.next(0);
-      this.restReady$.next(false);
-    });
+    this.overflowItems$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((overflowItems) => {
+        if (!overflowItems.length) {
+          this.displayCount$.next(0);
+          this.suffixFixedStart$.next(null);
+        }
+      });
     combineLatest([
+      overflowItemsWidth$,
       this.containerWidth$,
-      overflowItems$,
-      this.mergedRestWidth$,
+      this.maxRestWith$,
       this.restWidth$,
       this.suffixWidth$,
-      this.mergedData$,
     ])
-      .pipe(takeUntil(this.destroy$))
+      .pipe(
+        filter(
+          ([, containerWidth, maxRestWith]) => !!(containerWidth && maxRestWith)
+        ),
+        takeUntil(this.destroy$)
+      )
       .subscribe(
         ([
+          overflowItemsWidth,
           containerWidth,
-          overflowItems,
-          mergedRestWidth,
+          maxRestWith,
           restWidth,
           suffixWidth,
-          mergedData,
         ]) => {
-          if (containerWidth && mergedRestWidth && mergedData) {
-            let totalWidth = suffixWidth;
-
-            const len = mergedData.length;
-            const lastIndex = len - 1;
-
-            // When data count change to 0, reset this since not loop will reach
-            if (!len) {
-              this.displayCount$.next(0);
-              this.suffixFixedStart$.next(null);
-              return;
-            }
-
-            for (let i = 0; i < len; i += 1) {
-              const currentItemWidth = overflowItems.get(i)?.itemWidth;
-              // Break since data not ready
-              if (currentItemWidth === undefined) {
-                this.updateDisplayCount(i - 1, true);
-                break;
-              }
-
+          let totalWidth = suffixWidth;
+          const len = overflowItemsWidth.length;
+          const lastIndex = len - 1;
+          for (let i = 0; i < len; i += 1) {
+            const currentItemWidth = overflowItemsWidth[i];
+            // Break since data not ready
+            if (currentItemWidth === undefined) {
+              this.updateDisplayCount(i - 1, true);
+              break;
+            } else {
               // Find best match
               totalWidth += currentItemWidth;
 
@@ -165,15 +132,14 @@ export class OverflowContainerComponent
                 (lastIndex === 0 && totalWidth <= containerWidth) ||
                 // Last two width will be the final width
                 (i === lastIndex - 1 &&
-                  overflowItems.get(lastIndex)?.itemWidth !== undefined &&
-                  totalWidth + overflowItems.get(lastIndex)!.itemWidth! <=
-                    containerWidth)
+                  overflowItemsWidth[lastIndex] !== undefined &&
+                  totalWidth + overflowItemsWidth[lastIndex]! <= containerWidth)
               ) {
                 // Additional check if match the end
                 this.updateDisplayCount(lastIndex);
                 this.suffixFixedStart$.next(null);
                 break;
-              } else if (totalWidth + mergedRestWidth > containerWidth) {
+              } else if (totalWidth + maxRestWith > containerWidth) {
                 // Can not hold all the content to show rest
                 this.updateDisplayCount(i - 1);
                 this.suffixFixedStart$.next(
@@ -183,16 +149,16 @@ export class OverflowContainerComponent
               }
               this.cdr.detectChanges();
             }
-
-            if (
-              this.overflowSuffix &&
-              overflowItems.get(0)?.itemWidth !== undefined &&
-              overflowItems.get(0)!.itemWidth! + suffixWidth > containerWidth
-            ) {
-              this.suffixFixedStart$.next(null);
-            }
-            this.cdr.detectChanges();
           }
+          if (
+            this.overflowSuffix &&
+            overflowItemsWidth[0] !== undefined &&
+            overflowItemsWidth[0] + suffixWidth > containerWidth
+          ) {
+            this.suffixFixedStart$.next(null);
+          }
+
+          this.cdr.detectChanges();
         }
       );
     combineLatest([this.suffixFixedStart$, this.displayCount$])

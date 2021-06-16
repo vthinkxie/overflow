@@ -7,8 +7,10 @@ app-overflow-container {
 .container {
   border: 5px solid green;
   padding: 8px;
-  max-width: 300px;
+  width: 300px;
   margin-top: 32px;
+  resize: horizontal;
+  overflow: scroll;
 }
 
 .label {
@@ -39,7 +41,6 @@ app-overflow-container {
   background: rgba(0, 0, 0, 0.1);
   min-width: 10px;
   max-width: 100%;
-  font-family: -apple-system;
 }
 
 .measure {
@@ -51,7 +52,6 @@ app-overflow-container {
   padding: 0 4px;
   pointer-events: none;
   position: absolute;
-  font-family: -apple-system;
   left: 0;
   top: 200%;
 }

@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Directive, ElementRef } from '@angular/core';
-import { map, tap } from 'rxjs/operators';
+import { distinctUntilChanged, map, startWith, tap } from 'rxjs/operators';
 import { NzResizeObserver } from './resize-observer';
 
 @Directive({
@@ -15,6 +15,8 @@ export class OverflowItemDirective {
     .observe(this.elementRef.nativeElement)
     .pipe(
       map(([item]) => (item.target as HTMLElement).offsetWidth),
+      distinctUntilChanged(),
+      startWith(undefined),
       tap((width) => {
         this.itemWidth = width;
       })
@@ -22,7 +24,7 @@ export class OverflowItemDirective {
   itemWidth: number | undefined = undefined;
   constructor(
     private nzResizeObserver: NzResizeObserver,
-    private elementRef: ElementRef,
+    public elementRef: ElementRef,
     private cdr: ChangeDetectorRef
   ) {}
 
